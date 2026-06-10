@@ -1,0 +1,10 @@
+/* AmbulanceBooking Page styles */
+
+.ambulance-booking-glow:focus-within {
+  box-shadow: 0 0 25px -5px rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.ambulance-warning-box {
+  border-left: 4px solid #f59e0b;
+}

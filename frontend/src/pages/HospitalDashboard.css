@@ -1,0 +1,18 @@
+/* HospitalDashboard Page styles */
+
+.hospital-badge-active {
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.1);
+}
+
+.hospital-alert-flash {
+  animation: border-flash 2s infinite;
+}
+
+@keyframes border-flash {
+  0%, 100% {
+    border-color: rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    border-color: rgba(239, 68, 68, 0.6);
+  }
+}

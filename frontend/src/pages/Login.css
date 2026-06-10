@@ -1,0 +1,13 @@
+/* Login Page styles */
+
+.login-form-glow:focus-within {
+  box-shadow: 0 0 25px -5px rgba(2, 132, 199, 0.08);
+}
+
+.login-role-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-role-btn:hover {
+  transform: translateY(-1px);
+}

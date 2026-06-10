@@ -1,0 +1,9 @@
+/* Register Page styles */
+
+.register-input-row {
+  transition: max-height 0.3s ease;
+}
+
+.register-provider-highlight {
+  border-left: 4px solid #10b981;
+}

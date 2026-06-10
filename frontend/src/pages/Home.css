@@ -1,0 +1,42 @@
+/* Home Page specific animations and interactions */
+
+.home-hero-glow {
+  background: radial-gradient(circle, rgba(2, 132, 199, 0.1) 0%, rgba(255, 255, 255, 0) 70%);
+}
+
+.home-badge-float {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-10px) scale(1.02);
+  }
+}
+
+.feature-card-lift {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.feature-card-lift:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.08);
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
