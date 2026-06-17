@@ -136,7 +136,7 @@ const updateBookingStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
 
-    if (!['pending', 'approved', 'rejected', 'completed'].includes(status)) {
+    if (!['pending', 'payment-pending', 'approved', 'rejected', 'completed'].includes(status)) {
       res.status(400);
       throw new Error('Invalid status option');
     }
@@ -153,6 +153,15 @@ const updateBookingStatus = async (req, res, next) => {
       if (!hospital || booking.hospitalId.toString() !== hospital._id.toString()) {
         res.status(403);
         throw new Error('Not authorized to modify this booking');
+      }
+    } else if (req.user.role === 'patient') {
+      if (booking.patientId.toString() !== req.user._id.toString()) {
+        res.status(403);
+        throw new Error('Not authorized to modify this booking');
+      }
+      if (status !== 'approved' || booking.bookingStatus !== 'payment-pending') {
+        res.status(400);
+        throw new Error('Patients can only approve their own booking after a payment request');
       }
     }
 

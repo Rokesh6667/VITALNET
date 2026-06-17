@@ -20,6 +20,6 @@ router.route('/:id')
   .get(getBookingById)
   .delete(deleteBooking);
 
-router.put('/:id/status', authorizeRoles('hospital', 'admin'), updateBookingStatus);
+router.put('/:id/status', authorizeRoles('hospital', 'admin', 'patient'), updateBookingStatus);
 
 module.exports = router;

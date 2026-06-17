@@ -77,7 +77,24 @@ const getHospitalsList = async (req, res, next) => {
     const hospitals = await Hospital.find()
       .populate('userId', 'name email phoneNumber')
       .sort({ createdAt: -1 });
-    res.json(hospitals);
+
+    const hospitalsWithResources = await Promise.all(
+      hospitals.map(async (hospital) => {
+        const resources = await Resource.findOne({ hospitalId: hospital._id });
+        return {
+          ...hospital._doc,
+          resources: resources || {
+            availableBeds: 0,
+            availableICUBeds: 0,
+            availableVentilators: 0,
+            totalBeds: 0,
+            totalICUBeds: 0,
+            totalVentilators: 0
+          }
+        };
+      })
+    );
+    res.json(hospitalsWithResources);
   } catch (error) {
     next(error);
   }
@@ -197,6 +214,70 @@ const approveHospital = async (req, res, next) => {
   }
 };
 
+// @desc    Delete user
+// @route   DELETE /api/admin/users/:id
+// @access  Private (Admin role only)
+const deleteUser = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+    if (user.role === 'hospital') {
+      const hospital = await Hospital.findOne({ userId: user._id });
+      if (hospital) {
+        await Resource.deleteOne({ hospitalId: hospital._id });
+        await Ambulance.deleteMany({ hospitalId: hospital._id });
+        await Booking.deleteMany({ hospitalId: hospital._id });
+        await Hospital.findByIdAndDelete(hospital._id);
+      }
+    }
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete hospital profile
+// @route   DELETE /api/admin/hospitals/:id
+// @access  Private (Admin role only)
+const deleteHospital = async (req, res, next) => {
+  try {
+    const hospital = await Hospital.findById(req.params.id);
+    if (!hospital) {
+      res.status(404);
+      throw new Error('Hospital not found');
+    }
+    await Resource.deleteOne({ hospitalId: hospital._id });
+    await Ambulance.deleteMany({ hospitalId: hospital._id });
+    await Booking.deleteMany({ hospitalId: hospital._id });
+    await User.findByIdAndDelete(hospital.userId);
+    await Hospital.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Hospital deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete ambulance
+// @route   DELETE /api/admin/ambulances/:id
+// @access  Private (Admin/Hospital role)
+const deleteAmbulance = async (req, res, next) => {
+  try {
+    const ambulance = await Ambulance.findById(req.params.id);
+    if (!ambulance) {
+      res.status(404);
+      throw new Error('Ambulance not found');
+    }
+    await Ambulance.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Ambulance deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getDashboard,
   getHospitalsList,
@@ -204,4 +285,7 @@ module.exports = {
   getBookingsList,
   getAnalytics,
   approveHospital,
+  deleteUser,
+  deleteHospital,
+  deleteAmbulance,
 };

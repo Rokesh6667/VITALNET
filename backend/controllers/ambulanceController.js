@@ -1,6 +1,7 @@
 const Ambulance = require('../models/Ambulance');
 const Hospital = require('../models/Hospital');
 const Notification = require('../models/Notification');
+const Booking = require('../models/Booking');
 const { emitToRoom, emitToAll } = require('../sockets/socketHandler');
 
 // @desc    Request an ambulance
@@ -8,7 +9,7 @@ const { emitToRoom, emitToAll } = require('../sockets/socketHandler');
 // @access  Private (Patient role)
 const requestAmbulance = async (req, res, next) => {
   try {
-    const { hospitalId, latitude, longitude } = req.body;
+    const { hospitalId, latitude, longitude, patientCondition } = req.body;
 
     if (latitude === undefined || longitude === undefined) {
       res.status(400);
@@ -16,6 +17,10 @@ const requestAmbulance = async (req, res, next) => {
     }
 
     let targetHospitalId = hospitalId;
+    const mongoose = require('mongoose');
+    if (targetHospitalId && !mongoose.Types.ObjectId.isValid(targetHospitalId)) {
+      targetHospitalId = null;
+    }
 
     // If no hospitalId is provided, find the closest approved hospital
     if (!targetHospitalId) {
@@ -55,6 +60,16 @@ const requestAmbulance = async (req, res, next) => {
     ambulance.patientId = req.user._id;
     await ambulance.save();
 
+    // Create a Booking record in the database
+    const booking = await Booking.create({
+      patientId: req.user._id,
+      hospitalId: targetHospitalId,
+      bookingType: 'ambulance',
+      bookingStatus: 'approved',
+      patientCondition: patientCondition || 'Emergency Transport',
+      ambulanceId: ambulance._id
+    });
+
     // Create notifications for patient and hospital user
     const hospital = await Hospital.findById(targetHospitalId);
 
@@ -81,6 +96,7 @@ const requestAmbulance = async (req, res, next) => {
     res.json({
       message: 'Ambulance requested and assigned successfully',
       ambulance,
+      booking,
     });
   } catch (error) {
     next(error);
@@ -95,8 +111,8 @@ const getAmbulances = async (req, res, next) => {
     let query = {};
 
     if (req.user.role === 'patient') {
-      // Find ambulance currently assigned to the patient
-      query = { patientId: req.user._id };
+      // Return all ambulances to let patient see available counts across dispatch hubs
+      query = {};
     } else if (req.user.role === 'hospital') {
       // Find ambulances belonging to this hospital
       const hospital = await Hospital.findOne({ userId: req.user._id });
@@ -125,7 +141,7 @@ const updateAmbulanceStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
 
-    if (!['available', 'assigned', 'onRoute', 'completed'].includes(status)) {
+    if (!['available', 'assigned', 'onRoute', 'in-transit', 'completed'].includes(status)) {
       res.status(400);
       throw new Error('Invalid status option');
     }
@@ -228,9 +244,44 @@ const updateAmbulanceLocation = async (req, res, next) => {
   }
 };
 
+// @desc    Add a new ambulance
+// @route   POST /api/ambulance
+// @access  Private (Hospital, Admin)
+const addAmbulance = async (req, res, next) => {
+  try {
+    const { vehicleNumber, driverName, driverPhone, currentLatitude, currentLongitude } = req.body;
+
+    if (!vehicleNumber || !driverName || !driverPhone) {
+      res.status(400);
+      throw new Error('Please enter vehicleNumber, driverName, and driverPhone');
+    }
+
+    const hospital = await Hospital.findOne({ userId: req.user._id });
+    if (!hospital) {
+      res.status(404);
+      throw new Error('Hospital profile not found for this user');
+    }
+
+    const ambulance = await Ambulance.create({
+      hospitalId: hospital._id,
+      vehicleNumber,
+      driverName,
+      driverPhone,
+      currentLatitude: currentLatitude !== undefined ? parseFloat(currentLatitude) : hospital.latitude,
+      currentLongitude: currentLongitude !== undefined ? parseFloat(currentLongitude) : hospital.longitude,
+      status: 'available',
+    });
+
+    res.status(201).json(ambulance);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   requestAmbulance,
   getAmbulances,
   updateAmbulanceStatus,
   updateAmbulanceLocation,
+  addAmbulance,
 };

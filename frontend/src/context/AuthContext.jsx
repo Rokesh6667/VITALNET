@@ -1,64 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import api, { authApi } from '../services/authApi';
+import { hospitalApi } from '../services/hospitalApi';
+import { bookingApi } from '../services/bookingApi';
+import { ambulanceApi } from '../services/ambulanceApi';
 
 const AuthContext = createContext();
-
-// Mock initial data if localStorage is empty
-const defaultPatients = [
-  { id: 'u1', name: 'John Doe', email: 'patient@vitalnet.com', role: 'patient', phone: '+1 555-0199', address: '742 Evergreen Terrace', password: 'password123' }
-];
-
-const defaultHospitals = [
-  {
-    id: 'h1',
-    name: 'City General Hospital',
-    email: 'hospital@vitalnet.com',
-    role: 'hospital',
-    phone: '+1 555-0120',
-    address: '120 Medical Center Parkway',
-    latitude: 37.7749,
-    longitude: -122.4194,
-    resources: { beds: 15, icuBeds: 5, ventilators: 3 },
-    district: 'Chennai',
-    password: 'password123'
-  },
-  {
-    id: 'h2',
-    name: 'St. Jude Emergency Center',
-    email: 'stjude@vitalnet.com',
-    role: 'hospital',
-    phone: '+1 555-0144',
-    address: '455 Care Lane',
-    latitude: 37.7833,
-    longitude: -122.4167,
-    resources: { beds: 4, icuBeds: 1, ventilators: 0 },
-    district: 'Coimbatore',
-    password: 'password123'
-  },
-  {
-    id: 'h3',
-    name: 'Mercy Hope Clinic',
-    email: 'mercy@vitalnet.com',
-    role: 'hospital',
-    phone: '+1 555-0188',
-    address: '88 Grace Ave',
-    latitude: 37.7699,
-    longitude: -122.4468,
-    resources: { beds: 35, icuBeds: 12, ventilators: 8 },
-    district: 'Madurai',
-    password: 'password123'
-  }
-];
-
-const defaultAmbulances = [
-  { id: 'a1', vehicleNo: 'AMB-2026-A', driverName: 'Robert Vance', phone: '+1 555-0301', status: 'available', latitude: 37.7749, longitude: -122.4194, hospitalId: 'h1' },
-  { id: 'a2', vehicleNo: 'AMB-2026-B', driverName: 'Sarah Jenkins', phone: '+1 555-0302', status: 'in-transit', latitude: 37.7794, longitude: -122.4225, hospitalId: 'h1' },
-  { id: 'a3', vehicleNo: 'AMB-2026-C', driverName: 'David Miller', phone: '+1 555-0303', status: 'available', latitude: 37.7833, longitude: -122.4167, hospitalId: 'h2' }
-];
-
-const defaultBookings = [
-  { id: 'b1', patientName: 'John Doe', patientId: 'u1', hospitalName: 'City General Hospital', hospitalId: 'h1', type: 'ICU', status: 'pending', createdAt: new Date(Date.now() - 3600000 * 2).toLocaleString() },
-  { id: 'b2', patientName: 'John Doe', patientId: 'u1', hospitalName: 'St. Jude Emergency Center', hospitalId: 'h2', type: 'Ambulance', status: 'pending', createdAt: new Date().toLocaleString(), ambulanceId: 'a2' }
-];
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
@@ -70,115 +16,180 @@ export const AuthProvider = ({ children }) => {
     return localStorage.getItem('vn_token') || null;
   });
 
-  // State-based mock database synced with localStorage for a robust demonstration
-  const [dbHospitals, setDbHospitals] = useState(() => {
-    const saved = localStorage.getItem('vn_db_hospitals_v3');
-    return saved ? JSON.parse(saved) : defaultHospitals;
-  });
+  const [dbHospitals, setDbHospitals] = useState([]);
+  const [dbAmbulances, setDbAmbulances] = useState([]);
+  const [dbBookings, setDbBookings] = useState([]);
+  const [dbPatients, setDbPatients] = useState([]);
 
-  const [dbAmbulances, setDbAmbulances] = useState(() => {
-    const saved = localStorage.getItem('vn_db_ambulances');
-    return saved ? JSON.parse(saved) : defaultAmbulances;
-  });
+  const fetchAllData = async () => {
+    if (!localStorage.getItem('vn_token') && !token) return;
 
-  const [dbBookings, setDbBookings] = useState(() => {
-    const saved = localStorage.getItem('vn_db_bookings_v3');
-    return saved ? JSON.parse(saved) : defaultBookings;
-  });
+    try {
+      // 1. Fetch hospitals
+      let hospitalsList = [];
+      if (user?.role === 'admin') {
+        const res = await api.get('/admin/hospitals');
+        hospitalsList = res.data;
+      } else {
+        hospitalsList = await hospitalApi.getHospitals();
+      }
+      const mappedHospitals = hospitalsList.map(h => ({
+        id: h._id,
+        name: h.hospitalName || h.name,
+        email: h.email,
+        role: 'hospital',
+        phone: h.phone || h.phoneNumber,
+        address: h.address,
+        latitude: h.latitude,
+        longitude: h.longitude,
+        resources: {
+          beds: h.resources?.availableBeds ?? 0,
+          icuBeds: h.resources?.availableICUBeds ?? 0,
+          ventilators: h.resources?.availableVentilators ?? 0
+        },
+        district: h.city,
+        approvalStatus: h.approvalStatus
+      }));
+      setDbHospitals(mappedHospitals);
+    } catch (err) {
+      console.error('Error fetching hospitals:', err);
+    }
 
-  const [dbPatients, setDbPatients] = useState(() => {
-    const saved = localStorage.getItem('vn_db_patients');
-    return saved ? JSON.parse(saved) : defaultPatients;
-  });
+    try {
+      // 2. Fetch ambulances
+      const ambulancesList = await ambulanceApi.getAmbulances();
+      const mappedAmbulances = ambulancesList.map(a => ({
+        id: a._id,
+        vehicleNo: a.vehicleNumber || a.vehicleNo,
+        driverName: a.driverName,
+        phone: a.driverPhone || a.phone,
+        status: a.status,
+        latitude: a.currentLatitude || a.latitude,
+        longitude: a.currentLongitude || a.longitude,
+        hospitalId: a.hospitalId?._id || a.hospitalId
+      }));
+      setDbAmbulances(mappedAmbulances);
+    } catch (err) {
+      console.error('Error fetching ambulances:', err);
+    }
+
+    try {
+      // 3. Fetch bookings
+      let bookingsList = [];
+      if (user?.role === 'admin') {
+        const res = await api.get('/admin/bookings');
+        bookingsList = res.data;
+      } else {
+        bookingsList = await bookingApi.getBookings();
+      }
+      const mappedBookings = bookingsList.map(b => ({
+        id: b._id,
+        patientId: b.patientId?._id || b.patientId,
+        patientName: b.patientId?.name || 'Patient',
+        hospitalId: b.hospitalId?._id || b.hospitalId,
+        hospitalName: b.hospitalId?.hospitalName || 'Hospital',
+        type: b.bookingType === 'ambulance' ? 'Ambulance' : (b.bookingType === 'bed' ? 'Bed' : (b.bookingType === 'ICU' ? 'ICU' : (b.bookingType === 'ventilator' ? 'Ventilator' : (b.bookingType || b.type)))),
+        status: b.bookingStatus || b.status,
+        symptoms: b.patientCondition || b.symptoms,
+        createdAt: new Date(b.createdAt).toLocaleString(),
+        ambulanceId: b.ambulanceId
+      }));
+      setDbBookings(mappedBookings);
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+    }
+
+    if (user?.role === 'admin') {
+      try {
+        const res = await api.get('/admin/users');
+        const mappedPatients = res.data.filter(u => u.role === 'patient').map(p => ({
+          id: p._id,
+          name: p.name,
+          email: p.email,
+          role: 'patient',
+          phone: p.phoneNumber || p.phone,
+          address: p.address || 'N/A'
+        }));
+        setDbPatients(mappedPatients);
+      } catch (err) {
+        console.error('Error fetching patients:', err);
+      }
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem('vn_db_hospitals_v3', JSON.stringify(dbHospitals));
-  }, [dbHospitals]);
-
-  useEffect(() => {
-    localStorage.setItem('vn_db_ambulances', JSON.stringify(dbAmbulances));
-  }, [dbAmbulances]);
-
-  useEffect(() => {
-    localStorage.setItem('vn_db_bookings_v3', JSON.stringify(dbBookings));
-  }, [dbBookings]);
-
-  useEffect(() => {
-    localStorage.setItem('vn_db_patients', JSON.stringify(dbPatients));
-  }, [dbPatients]);
+    if (token) {
+      fetchAllData();
+    }
+  }, [token, user?.role]);
 
   const login = async (email, password, role) => {
-    // Basic validation / Simulation
-    let matchedUser = null;
-    
-    if (role === 'admin' && email === 'rokesh@vitalnet.com') {
-      if (password !== '2006') {
-        throw new Error('Kindly enter the valid email ID and password.');
-      }
-      matchedUser = { id: 'admin', name: 'System Administrator', email: 'rokesh@vitalnet.com', role: 'admin', password: '2006' };
-    } else if (role === 'hospital') {
-      matchedUser = dbHospitals.find(h => h.email === email);
-    } else if (role === 'patient') {
-      matchedUser = dbPatients.find(p => p.email === email);
-    }
-
-    if (!matchedUser) {
-      throw new Error('Kindly enter the valid email ID and password.');
-    }
-
-    const correctPassword = matchedUser.password || 'apollo';
-    if (correctPassword !== password) {
-      throw new Error('Kindly enter the valid email ID and password.');
-    }
-
-    setUser(matchedUser);
-    const fakeToken = 'mock_jwt_token_' + matchedUser.id;
-    setToken(fakeToken);
-    localStorage.setItem('vn_user', JSON.stringify(matchedUser));
-    localStorage.setItem('vn_token', fakeToken);
-    return matchedUser;
+    const res = await authApi.login(email, password, role);
+    const profile = {
+      id: res.role === 'hospital' ? res.hospitalProfile?._id : res._id,
+      userId: res._id,
+      name: res.name,
+      email: res.email,
+      role: res.role,
+      token: res.token,
+      phone: res.phoneNumber || res.phone,
+      address: res.role === 'hospital' ? res.hospitalProfile?.address : res.address || '',
+      resources: res.hospitalProfile ? {
+        beds: res.hospitalProfile.resources?.availableBeds ?? 0,
+        icuBeds: res.hospitalProfile.resources?.availableICUBeds ?? 0,
+        ventilators: res.hospitalProfile.resources?.availableVentilators ?? 0
+      } : null
+    };
+    setUser(profile);
+    setToken(res.token);
+    localStorage.setItem('vn_user', JSON.stringify(profile));
+    localStorage.setItem('vn_token', res.token);
+    return profile;
   };
 
   const register = async (userData) => {
     const { name, email, password, role, phone, address, beds, icuBeds, ventilators, district } = userData;
-    
-    // Check if exists
-    const exists = (role === 'hospital' ? dbHospitals : dbPatients).some(u => u.email === email);
-    if (exists) {
-      throw new Error('User/Hospital with this email already exists');
-    }
-
-    const newUser = {
-      id: role + '_' + Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      password,
-      role,
-      phone,
-      address,
-      district: role === 'hospital' ? district : undefined
-    };
-
+    let newUser;
     if (role === 'hospital') {
-      newUser.resources = {
+      newUser = await authApi.registerHospital({
+        hospitalName: name,
+        email,
+        password,
+        phone,
+        address,
+        city: district || 'Chennai',
+        latitude: 37.7749 + (Math.random() - 0.5) * 0.05,
+        longitude: -122.4194 + (Math.random() - 0.5) * 0.05,
+        emergencyAvailable: true,
         beds: parseInt(beds) || 0,
         icuBeds: parseInt(icuBeds) || 0,
         ventilators: parseInt(ventilators) || 0
-      };
-      newUser.latitude = 37.7749 + (Math.random() - 0.5) * 0.05;
-      newUser.longitude = -122.4194 + (Math.random() - 0.5) * 0.05;
-      setDbHospitals(prev => [...prev, newUser]);
+      });
     } else {
-      setDbPatients(prev => [...prev, newUser]);
+      newUser = await authApi.registerPatient({
+        name,
+        email,
+        password,
+        phoneNumber: phone,
+        address
+      });
     }
-
-    // Auto-login
-    setUser(newUser);
-    const fakeToken = 'mock_jwt_token_' + newUser.id;
-    setToken(fakeToken);
-    localStorage.setItem('vn_user', JSON.stringify(newUser));
-    localStorage.setItem('vn_token', fakeToken);
-    return newUser;
+    
+    const profile = {
+      id: newUser.role === 'hospital' ? newUser.hospitalProfile?._id : newUser._id,
+      userId: newUser._id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      token: newUser.token,
+      phone: newUser.phoneNumber || newUser.phone,
+      address: newUser.address || ''
+    };
+    setUser(profile);
+    setToken(newUser.token);
+    localStorage.setItem('vn_user', JSON.stringify(profile));
+    localStorage.setItem('vn_token', newUser.token);
+    return profile;
   };
 
   const logout = () => {
@@ -188,90 +199,94 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('vn_token');
   };
 
-  // Helper functions to simulate DB operations in memory
-  const updateHospitalResources = (hospitalId, resources) => {
-    setDbHospitals(prev => prev.map(h => {
-      if (h.id === hospitalId) {
-        const updated = { ...h, resources: { ...h.resources, ...resources } };
-        // Sync logged in user if they are the hospital
-        if (user && user.id === hospitalId) {
-          setUser(updated);
-          localStorage.setItem('vn_user', JSON.stringify(updated));
-        }
-        return updated;
-      }
-      return h;
-    }));
-  };
-
-  const createBooking = (bookingData) => {
-    const newBooking = {
-      id: 'b_' + Math.random().toString(36).substr(2, 9),
-      patientId: user?.id || 'u1',
-      patientName: user?.name || 'John Doe',
-      createdAt: new Date().toLocaleString(),
-      status: 'pending',
-      ...bookingData
+  const updateHospitalResources = async (hospitalId, resources) => {
+    const backendResources = {
+      totalBeds: resources.beds,
+      availableBeds: resources.beds,
+      totalICUBeds: resources.icuBeds,
+      availableICUBeds: resources.icuBeds,
+      totalVentilators: resources.ventilators,
+      availableVentilators: resources.ventilators,
     };
+    await hospitalApi.updateResources(backendResources);
     
-    // Decrement hospital resources if approved or instantly block them
-    setDbBookings(prev => [newBooking, ...prev]);
-    return newBooking;
+    // Sync local user resources state if they are the logged in hospital
+    if (user && user.id === hospitalId) {
+      const updatedUser = { ...user, resources };
+      setUser(updatedUser);
+      localStorage.setItem('vn_user', JSON.stringify(updatedUser));
+    }
+    fetchAllData();
   };
 
-  const updateBookingStatus = (bookingId, status) => {
-    setDbBookings(prev => prev.map(b => {
-      if (b.id === bookingId) {
-        const updatedBooking = { ...b, status };
-        
-        // Handle resource decrement if approved
-        if (status === 'approved') {
-          const hosp = dbHospitals.find(h => h.id === b.hospitalId);
-          if (hosp) {
-            let update = {};
-            if (b.type === 'Bed' && hosp.resources.beds > 0) update.beds = hosp.resources.beds - 1;
-            if (b.type === 'ICU' && hosp.resources.icuBeds > 0) update.icuBeds = hosp.resources.icuBeds - 1;
-            if (b.type === 'Ventilator' && hosp.resources.ventilators > 0) update.ventilators = hosp.resources.ventilators - 1;
-            
-            if (Object.keys(update).length > 0) {
-              updateHospitalResources(b.hospitalId, update);
-            }
-          }
-          
-          // Dispatch ambulance if booking type is Ambulance
-          if (b.type === 'Ambulance') {
-            const availAmb = dbAmbulances.find(a => a.hospitalId === b.hospitalId && a.status === 'available');
-            if (availAmb) {
-              setDbAmbulances(prevAmbs => prevAmbs.map(a => 
-                a.id === availAmb.id ? { ...a, status: 'in-transit' } : a
-              ));
-              updatedBooking.ambulanceId = availAmb.id;
-            }
-          }
-        }
-        return updatedBooking;
-      }
-      return b;
-    }));
+  const createBooking = async (bookingData) => {
+    if (bookingData.type === 'Ambulance') {
+      const response = await ambulanceApi.requestAmbulance({
+        hospitalId: bookingData.hospitalId || undefined,
+        latitude: 37.7749,
+        longitude: -122.4194,
+        patientCondition: bookingData.symptoms || 'Emergency Transport'
+      });
+      fetchAllData();
+      return response.ambulance;
+    } else {
+      let bookingType = 'bed';
+      if (bookingData.type === 'ICU') bookingType = 'ICU';
+      if (bookingData.type === 'Ventilator') bookingType = 'ventilator';
+      
+      const response = await bookingApi.createBooking({
+        hospitalId: bookingData.hospitalId,
+        bookingType,
+        patientCondition: bookingData.symptoms || 'None specified'
+      });
+      fetchAllData();
+      return response;
+    }
   };
 
-  const addAmbulance = (ambulanceData) => {
-    const newAmb = {
-      id: 'a_' + Math.random().toString(36).substr(2, 9),
-      status: 'available',
-      latitude: user?.latitude || 37.7749,
-      longitude: user?.longitude || -122.4194,
-      hospitalId: user?.id,
-      ...ambulanceData
-    };
-    setDbAmbulances(prev => [...prev, newAmb]);
-    return newAmb;
+  const updateBookingStatus = async (bookingId, status) => {
+    await bookingApi.updateBookingStatus(bookingId, status);
+    fetchAllData();
   };
 
-  const updateAmbulanceStatus = (ambId, status) => {
-    setDbAmbulances(prev => prev.map(a => 
-      a.id === ambId ? { ...a, status } : a
-    ));
+  const addAmbulance = async (ambulanceData) => {
+    const response = await ambulanceApi.addAmbulance({
+      vehicleNumber: ambulanceData.vehicleNo,
+      driverName: ambulanceData.driverName,
+      driverPhone: ambulanceData.phone
+    });
+    fetchAllData();
+    return response;
+  };
+
+  const updateAmbulanceStatus = async (ambId, status) => {
+    await ambulanceApi.updateAmbulanceStatus(ambId, status);
+    fetchAllData();
+  };
+
+  const deleteHospital = async (id) => {
+    await api.delete(`/admin/hospitals/${id}`);
+    fetchAllData();
+  };
+
+  const deletePatient = async (id) => {
+    await api.delete(`/admin/users/${id}`);
+    fetchAllData();
+  };
+
+  const deleteAmbulanceAdmin = async (id) => {
+    await api.delete(`/admin/ambulances/${id}`);
+    fetchAllData();
+  };
+
+  const deleteBooking = async (id) => {
+    await bookingApi.deleteBooking(id);
+    fetchAllData();
+  };
+
+  const approveHospital = async (id) => {
+    await api.put(`/admin/approve-hospital/${id}`, { status: 'approved' });
+    fetchAllData();
   };
 
   return (
@@ -293,7 +308,12 @@ export const AuthProvider = ({ children }) => {
       createBooking,
       updateBookingStatus,
       addAmbulance,
-      updateAmbulanceStatus
+      updateAmbulanceStatus,
+      deleteHospital,
+      deletePatient,
+      deleteAmbulanceAdmin,
+      deleteBooking,
+      approveHospital
     }}>
       {children}
     </AuthContext.Provider>

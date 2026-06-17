@@ -32,7 +32,7 @@ const ambulanceSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['available', 'assigned', 'onRoute', 'completed'],
+      enum: ['available', 'assigned', 'onRoute', 'in-transit', 'completed'],
       default: 'available',
     },
     // Optional associations for assignments

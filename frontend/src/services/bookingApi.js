@@ -10,7 +10,11 @@ export const bookingApi = {
     return res.data;
   },
   updateBookingStatus: async (bookingId, status) => {
-    const res = await api.put(`/bookings/${bookingId}`, { status });
+    const res = await api.put(`/bookings/${bookingId}/status`, { status });
+    return res.data;
+  },
+  deleteBooking: async (bookingId) => {
+    const res = await api.delete(`/bookings/${bookingId}`);
     return res.data;
   },
   triggerSOS: async (location) => {

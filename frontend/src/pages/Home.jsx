@@ -45,23 +45,21 @@ export default function Home() {
     let activeUser = user;
     if (!activeUser) {
       try {
-        activeUser = await login('patient@vitalnet.com', 'password', 'patient');
+        activeUser = await login('patient@vitalnet.com', 'password123', 'patient');
       } catch (err) {
         console.error(err);
       }
     }
 
-    const booking = createBooking({
+    const booking = await createBooking({
       patientId: activeUser?.id || 'u1',
-      patientName: activeUser?.name || 'John Doe',
+      patientName: activeUser?.name || 'Patient',
       hospitalId: nearestHospital.id,
       hospitalName: nearestHospital.name,
       type: 'Ambulance',
       symptoms: 'INSTANT EMERGENCY BOOKING - AUTO ROUTED',
       severity: 'Critical'
     });
-
-    updateBookingStatus(booking.id, 'approved');
 
     setDispatchedHospital(nearestHospital);
     setShowSosModal(true);

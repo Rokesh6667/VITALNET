@@ -10,7 +10,7 @@ const { emitToRoom } = require('../sockets/socketHandler');
 // @access  Public
 const registerPatient = async (req, res, next) => {
   try {
-    const { name, email, password, phoneNumber } = req.body;
+    const { name, email, password, phoneNumber, address } = req.body;
 
     if (!name || !email || !password || !phoneNumber) {
       res.status(400);
@@ -30,6 +30,7 @@ const registerPatient = async (req, res, next) => {
       password,
       role: 'patient',
       phoneNumber,
+      address,
     });
 
     if (user) {
@@ -39,6 +40,7 @@ const registerPatient = async (req, res, next) => {
         email: user.email,
         role: user.role,
         phoneNumber: user.phoneNumber,
+        address: user.address,
         token: generateToken(user._id),
       });
     } else {
@@ -174,6 +176,7 @@ const login = async (req, res, next) => {
         email: user.email,
         role: user.role,
         phoneNumber: user.phoneNumber,
+        address: user.address,
         token: generateToken(user._id),
         hospitalProfile,
       });
@@ -209,6 +212,7 @@ const getProfile = async (req, res, next) => {
         email: user.email,
         role: user.role,
         phoneNumber: user.phoneNumber,
+        address: user.address,
         ...extraInfo,
       });
     } else {

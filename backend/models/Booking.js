@@ -14,12 +14,12 @@ const bookingSchema = new mongoose.Schema(
     },
     bookingType: {
       type: String,
-      enum: ['bed', 'ICU', 'ventilator'],
+      enum: ['bed', 'ICU', 'ventilator', 'ambulance'],
       required: true,
     },
     bookingStatus: {
       type: String,
-      enum: ['pending', 'approved', 'rejected', 'completed'],
+      enum: ['pending', 'payment-pending', 'approved', 'rejected', 'completed'],
       default: 'pending',
     },
     patientCondition: {
@@ -29,6 +29,11 @@ const bookingSchema = new mongoose.Schema(
     bookingDate: {
       type: Date,
       default: Date.now,
+    },
+    ambulanceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Ambulance',
+      default: null,
     },
   },
   {

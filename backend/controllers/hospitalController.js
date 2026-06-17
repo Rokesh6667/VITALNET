@@ -8,7 +8,23 @@ const { emitToAll } = require('../sockets/socketHandler');
 const getHospitals = async (req, res, next) => {
   try {
     const hospitals = await Hospital.find({ approvalStatus: 'approved' });
-    res.json(hospitals);
+    const hospitalsWithResources = await Promise.all(
+      hospitals.map(async (hospital) => {
+        const resources = await Resource.findOne({ hospitalId: hospital._id });
+        return {
+          ...hospital._doc,
+          resources: resources || {
+            availableBeds: 0,
+            availableICUBeds: 0,
+            availableVentilators: 0,
+            totalBeds: 0,
+            totalICUBeds: 0,
+            totalVentilators: 0
+          }
+        };
+      })
+    );
+    res.json(hospitalsWithResources);
   } catch (error) {
     next(error);
   }

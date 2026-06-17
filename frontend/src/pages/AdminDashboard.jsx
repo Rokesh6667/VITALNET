@@ -10,10 +10,12 @@ export default function AdminDashboard() {
     dbAmbulances,
     dbBookings,
     dbPatients,
-    setDbHospitals,
-    setDbPatients,
-    setDbAmbulances,
-    setDbBookings
+    deleteHospital,
+    deletePatient,
+    deleteAmbulanceAdmin,
+    deleteBooking,
+    approveHospital,
+    register
   } = useAuth();
 
   const [activeTab, setActiveTab] = useState('analytics'); // analytics, hospitals, patients, ambulances
@@ -36,48 +38,67 @@ export default function AdminDashboard() {
   ];
 
   const resourceData = dbHospitals.map(h => ({
-    name: h.name.split(' ')[0],
-    beds: h.resources.beds,
-    icu: h.resources.icuBeds
+    name: h.name ? h.name.split(' ')[0] : 'Hospital',
+    beds: h.resources?.beds || 0,
+    icu: h.resources?.icuBeds || 0
   }));
 
-  const handleDeleteHospital = (id) => {
-    setDbHospitals(prev => prev.filter(h => h.id !== id));
+  const handleDeleteHospital = async (id) => {
+    try {
+      await deleteHospital(id);
+    } catch (err) {
+      alert(err.message || 'Failed to delete hospital');
+    }
   };
 
-  const handleDeletePatient = (id) => {
-    setDbPatients(prev => prev.filter(p => p.id !== id));
+  const handleDeletePatient = async (id) => {
+    try {
+      await deletePatient(id);
+    } catch (err) {
+      alert(err.message || 'Failed to delete patient');
+    }
   };
 
-  const handleDeleteAmbulance = (id) => {
-    setDbAmbulances(prev => prev.filter(a => a.id !== id));
+  const handleDeleteAmbulance = async (id) => {
+    try {
+      await deleteAmbulanceAdmin(id);
+    } catch (err) {
+      alert(err.message || 'Failed to delete ambulance');
+    }
   };
 
-  const handleDeleteBooking = (id) => {
-    setDbBookings(prev => prev.filter(b => b.id !== id));
+  const handleDeleteBooking = async (id) => {
+    try {
+      await deleteBooking(id);
+    } catch (err) {
+      alert(err.message || 'Failed to delete booking');
+    }
   };
 
-  const handleAddHospital = (e) => {
+  const handleAddHospital = async (e) => {
     e.preventDefault();
     if (!hospName || !hospEmail || !hospPhone || !hospAddress) return;
 
-    const newHosp = {
-      id: 'h_' + Math.random().toString(36).substr(2, 9),
-      name: hospName,
-      email: hospEmail,
-      phone: hospPhone,
-      address: hospAddress,
-      role: 'hospital',
-      resources: { beds: 10, icuBeds: 2, ventilators: 1 },
-      latitude: 37.7749,
-      longitude: -122.4194
-    };
-
-    setDbHospitals(prev => [...prev, newHosp]);
-    setHospName('');
-    setHospEmail('');
-    setHospPhone('');
-    setHospAddress('');
+    try {
+      await register({
+        name: hospName,
+        email: hospEmail,
+        password: 'password123',
+        role: 'hospital',
+        phone: hospPhone,
+        address: hospAddress,
+        beds: 10,
+        icuBeds: 2,
+        ventilators: 1,
+        district: 'Chennai'
+      });
+      setHospName('');
+      setHospEmail('');
+      setHospPhone('');
+      setHospAddress('');
+    } catch (err) {
+      alert(err.message || 'Failed to register facility');
+    }
   };
 
   return (
@@ -254,15 +275,36 @@ export default function AdminDashboard() {
                       <h4 className="font-extrabold text-slate-800 text-sm">{h.name}</h4>
                       <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">{h.address}</span>
                       <span className="text-[10px] text-slate-500 font-bold block mt-1">
-                        Beds: {h.resources.beds} | ICU: {h.resources.icuBeds} | Vent: {h.resources.ventilators}
+                        Beds: {h.resources?.beds || 0} | ICU: {h.resources?.icuBeds || 0} | Vent: {h.resources?.ventilators || 0}
+                      </span>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border mt-1.5 inline-block ${
+                        h.approvalStatus === 'approved' ? 'bg-brand-50 text-brand-700 border-brand-100' : 'bg-amber-50 text-amber-700 border-amber-100'
+                      }`}>
+                        {h.approvalStatus || 'pending'}
                       </span>
                     </div>
-                    <button
-                      onClick={() => handleDeleteHospital(h.id)}
-                      className="bg-red-50 hover:bg-red-100 text-emergency-600 border border-red-200 p-2 rounded-xl transition-all"
-                    >
-                      <Trash className="h-4.5 w-4.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {h.approvalStatus === 'pending' && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await approveHospital(h.id);
+                            } catch (err) {
+                              alert(err.message || 'Failed to approve hospital');
+                            }
+                          }}
+                          className="bg-brand-50 hover:bg-brand-100 text-brand-700 border border-brand-200 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all"
+                        >
+                          Approve
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteHospital(h.id)}
+                        className="bg-red-50 hover:bg-red-100 text-emergency-600 border border-red-200 p-2 rounded-xl transition-all"
+                      >
+                        <Trash className="h-4.5 w-4.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

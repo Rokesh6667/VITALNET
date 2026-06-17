@@ -39,7 +39,7 @@ export default function Login() {
       setEmail('patient@vitalnet.com');
       setPassword('password123');
     } else if (selectedRole === 'hospital') {
-      setEmail('hospital@vitalnet.com');
+      setEmail('manipal@hospital.com');
       setPassword('password123');
     } else if (selectedRole === 'admin') {
       setEmail('rokesh@vitalnet.com');

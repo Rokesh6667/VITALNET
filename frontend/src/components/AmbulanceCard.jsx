@@ -42,7 +42,7 @@ export default function AmbulanceCard({ ambulance, onStatusUpdate, showTrackButt
         </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex flex-col gap-2 mt-2">
         {onStatusUpdate && (
           <div className="flex gap-1.5 w-full">
             <button

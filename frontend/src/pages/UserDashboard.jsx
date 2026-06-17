@@ -6,7 +6,7 @@ import AmbulanceCard from '../components/AmbulanceCard';
 import './UserDashboard.css';
 
 export default function UserDashboard() {
-  const { user, dbBookings, dbAmbulances, createBooking, updateBookingStatus } = useAuth();
+  const { user, dbBookings, dbAmbulances, createBooking, updateBookingStatus, dbHospitals } = useAuth();
   const navigate = useNavigate();
   const [sosLoading, setSosLoading] = useState(false);
   const [sosTriggered, setSosTriggered] = useState(false);
@@ -22,23 +22,25 @@ export default function UserDashboard() {
   // Filter bookings for this patient
   const patientBookings = dbBookings.filter(b => b.patientId === user?.id || b.patientId === 'u1');
 
-  const handleSOSTrigger = () => {
+  const handleSOSTrigger = async () => {
     setSosLoading(true);
-    setTimeout(() => {
+    try {
       // Create a critical SOS Booking
-      createBooking({
-        hospitalId: 'h1',
-        hospitalName: 'City General Hospital',
+      await createBooking({
+        hospitalId: dbHospitals[0]?.id || '',
+        hospitalName: dbHospitals[0]?.name || 'City General Hospital',
         type: 'Ambulance',
         symptoms: 'CRITICAL EMERGENCY - SOS TRIGGERED',
         status: 'approved',
-        severity: 'Critical',
-        ambulanceId: 'a2' // Sarah Jenkins unit
+        severity: 'Critical'
       });
-      setSosLoading(false);
       setSosTriggered(true);
       setTimeout(() => setSosTriggered(false), 5000); // clear banner after 5s
-    }, 2000);
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to dispatch SOS ambulance. Make sure there is an approved hospital with available ambulances.');
+    } finally {
+      setSosLoading(false);
+    }
   };
 
   return (
@@ -76,7 +78,7 @@ export default function UserDashboard() {
                   <Heart className="h-6 w-6" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-800 leading-tight text-lg">{user?.name || 'John Doe'}</h3>
+                  <h3 className="font-extrabold text-slate-800 leading-tight text-lg">{user?.name || 'Patient'}</h3>
                   <span className="text-[10px] bg-slate-100 text-slate-500 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mt-1 inline-block">
                     {user?.role || 'Patient'}
                   </span>
@@ -93,8 +95,8 @@ export default function UserDashboard() {
                   <span className="text-slate-700">{user?.email || 'patient@vitalnet.com'}</span>
                 </div>
                 <div>
-                  <span className="block text-[10px] uppercase text-slate-400 font-bold mb-0.5">Home GPS Registry</span>
-                  <span className="text-slate-700">{user?.address || '742 Evergreen Terrace'}</span>
+                  <span className="block text-[10px] uppercase text-slate-400 font-bold mb-0.5">Address</span>
+                  <span className="text-slate-700">{user?.address || 'N/A'}</span>
                 </div>
               </div>
             </div>
@@ -217,13 +219,17 @@ export default function UserDashboard() {
                               ? 'bg-brand-50 text-brand-700 border-brand-100'
                               : booking.status === 'payment-pending'
                                 ? 'bg-purple-50 text-purple-700 border-purple-100'
-                                : 'bg-amber-50 text-amber-700 border-amber-100'
+                                : booking.status === 'rejected'
+                                  ? 'bg-red-50 text-emergency-600 border-red-100'
+                                  : 'bg-amber-50 text-amber-700 border-amber-100'
                           }`}>
                             {booking.status === 'approved'
                               ? 'Approved'
                               : booking.status === 'payment-pending'
                                 ? 'Awaiting Payment'
-                                : 'Status Pending'}
+                                : booking.status === 'rejected'
+                                  ? 'Rejected'
+                                  : 'Status Pending'}
                           </span>
                         </div>
                       </div>
@@ -283,15 +289,18 @@ export default function UserDashboard() {
 
             {/* Mock Payment Form */}
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 setPaymentLoading(true);
-                setTimeout(() => {
-                  updateBookingStatus(selectedBooking.id, 'approved');
-                  setPaymentLoading(false);
+                try {
+                  await updateBookingStatus(selectedBooking.id, 'approved');
                   setShowPaymentModal(false);
                   alert("Payment Successful! Your reservation is fully approved and confirmed.");
-                }, 1800);
+                } catch (err) {
+                  alert(err.message || 'Payment processing failed');
+                } finally {
+                  setPaymentLoading(false);
+                }
               }}
               className="space-y-4"
             >
